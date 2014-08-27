@@ -1,0 +1,8 @@
+Package: hbase
+Title: Direct HBase interface
+Version: 1.0-0
+Author: Simon Urbanek <simon.urbanek@r-project.org>
+Maintainer: Simon Urbanek <simon.urbanek@r-project.org>
+Description: Direct HBase interface
+Depends: rJava
+License: MIT
