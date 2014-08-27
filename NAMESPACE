@@ -1,2 +1,3 @@
+useDynLib(hbase, acc_create, acc_append, acc_result)
 exportPattern("^hbase.*")
 import(rJava)

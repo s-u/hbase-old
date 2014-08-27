@@ -32,23 +32,23 @@ hbase.table <- function(name) {
     structure(list(jobj=t, name=name), class="HBase_Table")
 }
 
-.restrict.get <- function(g, columns, family) {
+.restrict <- function(g, columns, family, sig="Lorg/apache/hadoop/hbase/client/Get;") {
     if (!missing(columns)) {
         if (missing(family)) { # use cf:column spec
             for (o in strsplit(as.character(columns), ":", TRUE)) {
                 if (is.null(o[[2L]]))
-                    .jcall(g, "Lorg/apache/hadoop/hbase/client/Get;", "addFamily", charToRaw(o[[1L]]))
+                    .jcall(g, sig, "addFamily", charToRaw(o[[1L]]))
                 else
-                    .jcall(g, "Lorg/apache/hadoop/hbase/client/Get;", "addColumn", charToRaw(o[[1L]]), charToRaw(o[[2L]]))
+                    .jcall(g, sig, "addColumn", charToRaw(o[[1L]]), charToRaw(o[[2L]]))
             }
         } else { # jsut use columns
             cf <- charToRaw(family)
             for (cn in columns)
-                .jcall(g, "Lorg/apache/hadoop/hbase/client/Get;", "addColumn", cf, charToRaw(cn))
+                .jcall(g, sig, "addColumn", cf, charToRaw(cn))
         }
     } else if (!missing(family))
         for (o in family)
-            .jcall(g, "Lorg/apache/hadoop/hbase/client/Get;", "addFamily", charToRaw(o))
+            .jcall(g, sig, "addFamily", charToRaw(o))
     g
 }
 
@@ -64,8 +64,8 @@ hbase.get <- function(table, keys, columns, family) {
     rc <- volatiles$res.convert
     if (is.jnull(rc)) rc <- volatiles$res.convert <- .jnew("Rpkg.hbase.HBResultTools")
     if (length(keys) == 1L) {
-        g <- .restrict.get(.jnew("org.apache.hadoop.hbase.client.Get", charToRaw(keys)),
-                           columns, family)
+        g <- .restrict(.jnew("org.apache.hadoop.hbase.client.Get", charToRaw(keys)),
+                       columns, family)
         res <- .jcall(rc, "[S", "newResult",
                       .jcall(table$jobj, "Lorg/apache/hadoop/hbase/client/Result;", "get", g))
         names(res) <- .jcall(rc, "[S", "columns")
@@ -78,4 +78,36 @@ hbase.get <- function(table, keys, columns, family) {
         l <- J("java.util.Arrays")$asList(.jarray(gets, "org.apache.hadoop.hbase.client.Get"))
         res <- .jcall(table$jobj, "[Lorg/apache/hadoop/hbase/client/Result;", "get", l)
     }
+}
+
+hbase.scan <- function(table, start, end, columns, family, limit=Inf) {
+    if (is.character(table))
+        table <- hbase.table(table)
+    if (!inherits(table, "HBase_Table"))
+        stop("invalid table object")
+    rc <- volatiles$res.convert
+    if (is.jnull(rc)) rc <- volatiles$res.convert <- .jnew("Rpkg.hbase.HBResultTools")
+    s <- if (!missing(end))
+        .jnew("org.apache.hadoop.hbase.client.Scan", charToRaw(start), charToRaw(end))
+    else if (!missing(start))
+        .jnew("org.apache.hadoop.hbase.client.Scan", charToRaw(start))
+    else
+        .jnew("org.apache.hadoop.hbase.client.Scan")
+
+    s <- .restrict(s, columns, family, sig = "Lorg/apache/hadoop/hbase/client/Scan;")
+    res <- .jcall(rc, "[S", "newScanner",
+                  .jcall(table$jobj, "Lorg/apache/hadoop/hbase/client/ResultScanner;",
+                         "getScanner", s))
+    names(res) <- .jcall(rc, "[S", "columns")
+    acc <- .Call(acc_create)
+    .Call(acc_append, acc, res)
+    l <- list(res)
+    i <- 1L
+    while (!is.jnull(res <- .jcall(rc, "[S", "next"))) {
+        names(res) <- .jcall(rc, "[S", "columns")
+        .Call(acc_append, acc, res)
+        i <- i + 1L
+        if (i >= limit) break
+    }
+    .Call(acc_result, acc, rbind)
 }
