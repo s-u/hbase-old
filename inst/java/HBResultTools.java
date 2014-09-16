@@ -29,7 +29,10 @@ public class HBResultTools {
     
     public String[] next() throws java.io.IOException {
 	res = scanner.next();
-	if (res == null) scanner.close();
+	if (res == null) {
+	    scanner.close();
+	    return null;
+	}
 	return newResult(res);
     }
 
